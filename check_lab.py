@@ -1,63 +1,95 @@
 import json
 import os
 
+
 def validate_lab():
-    print("🔍 Đang kiểm tra định dạng bài nộp...")
+    print("Dang kiem tra dinh dang bai nop...")
 
     required_files = [
+        "data/golden_set.jsonl",
         "reports/summary.json",
         "reports/benchmark_results.json",
-        "analysis/failure_analysis.md"
+        "analysis/failure_analysis.md",
+        "analysis/reflections/reflection_Tran_Duc_Dang_Khoi.md",
+        "analysis/reflections/reflection_Le_Thien_Khang.md",
+        "analysis/reflections/reflection_Nguyen_Thuy_Nhu_Quynh.md",
+        "analysis/reflections/reflection_Pham_Thanh_Nam.md",
     ]
 
-    # 1. Kiểm tra sự tồn tại của tất cả file
     missing = []
-    for f in required_files:
-        if os.path.exists(f):
-            print(f"✅ Tìm thấy: {f}")
+    for path in required_files:
+        if os.path.exists(path):
+            print(f"OK: {path}")
         else:
-            print(f"❌ Thiếu file: {f}")
-            missing.append(f)
+            print(f"MISSING: {path}")
+            missing.append(path)
 
     if missing:
-        print(f"\n❌ Thiếu {len(missing)} file. Hãy bổ sung trước khi nộp bài.")
+        print(f"\nThieu {len(missing)} file. Hay bo sung truoc khi nop bai.")
         return
 
-    # 2. Kiểm tra nội dung summary.json
     try:
         with open("reports/summary.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-    except json.JSONDecodeError as e:
-        print(f"❌ File reports/summary.json không phải JSON hợp lệ: {e}")
+    except json.JSONDecodeError as exc:
+        print(f"reports/summary.json khong phai JSON hop le: {exc}")
         return
 
     if "metrics" not in data or "metadata" not in data:
-        print("❌ File summary.json thiếu trường 'metrics' hoặc 'metadata'.")
+        print("summary.json thieu truong 'metrics' hoac 'metadata'.")
         return
 
     metrics = data["metrics"]
+    print("\n--- Thong ke nhanh ---")
+    print(f"Tong so cases: {data['metadata'].get('total', 'N/A')}")
+    print(f"Diem trung binh: {metrics.get('avg_score', 0):.2f}")
 
-    print(f"\n--- Thống kê nhanh ---")
-    print(f"Tổng số cases: {data['metadata'].get('total', 'N/A')}")
-    print(f"Điểm trung bình: {metrics.get('avg_score', 0):.2f}")
-
-    # EXPERT CHECKS
-    has_retrieval = "hit_rate" in metrics
-    if has_retrieval:
-        print(f"✅ Đã tìm thấy Retrieval Metrics (Hit Rate: {metrics['hit_rate']*100:.1f}%)")
+    if "hit_rate" in metrics:
+        print(f"OK: Retrieval Hit Rate = {metrics['hit_rate'] * 100:.1f}%")
     else:
-        print(f"⚠️ CẢNH BÁO: Thiếu Retrieval Metrics (hit_rate).")
+        print("WARNING: Thieu Retrieval Metrics (hit_rate).")
 
-    has_multi_judge = "agreement_rate" in metrics
-    if has_multi_judge:
-        print(f"✅ Đã tìm thấy Multi-Judge Metrics (Agreement Rate: {metrics['agreement_rate']*100:.1f}%)")
+    if "mrr" in metrics:
+        print(f"OK: MRR = {metrics['mrr']:.4f}")
     else:
-        print(f"⚠️ CẢNH BÁO: Thiếu Multi-Judge Metrics (agreement_rate).")
+        print("WARNING: Thieu Retrieval Metrics (mrr).")
+
+    if "agreement_rate" in metrics:
+        print(f"OK: Multi-Judge Agreement Rate = {metrics['agreement_rate'] * 100:.1f}%")
+    else:
+        print("WARNING: Thieu Multi-Judge Metrics (agreement_rate).")
 
     if data["metadata"].get("version"):
-        print(f"✅ Đã tìm thấy thông tin phiên bản Agent (Regression Mode)")
+        print("OK: Co thong tin phien ban Agent.")
 
-    print("\n🚀 Bài lab đã sẵn sàng để chấm điểm!")
+    try:
+        with open("data/golden_set.jsonl", "r", encoding="utf-8") as f:
+            cases = [json.loads(line) for line in f if line.strip()]
+    except json.JSONDecodeError as exc:
+        print(f"data/golden_set.jsonl khong phai JSONL hop le: {exc}")
+        return
+
+    if len(cases) >= 50:
+        print(f"OK: Golden Dataset co {len(cases)} cases.")
+    else:
+        print(f"WARNING: Golden Dataset chi co {len(cases)} cases, can it nhat 50.")
+
+    required_case_fields = {"id", "question", "expected_answer", "expected_retrieval_ids", "metadata"}
+    invalid_cases = [
+        case.get("id", f"line_{index + 1}")
+        for index, case in enumerate(cases)
+        if not required_case_fields.issubset(case)
+    ]
+    if invalid_cases:
+        print(f"WARNING: Co case thieu schema bat buoc: {invalid_cases[:5]}")
+    else:
+        print("OK: Golden Dataset co du schema bat buoc.")
+
+    if "regression" in data and data["regression"].get("decision"):
+        print(f"OK: Release Gate = {data['regression']['decision']}")
+
+    print("\nBai lab da san sang de cham diem.")
+
 
 if __name__ == "__main__":
     validate_lab()
